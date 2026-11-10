@@ -1,0 +1,63 @@
+# Banking Streamhouse demo on OpenShift. Contains no secrets: the two Secrets are created by deploy/DEPLOY.md.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamhouse-demo
+  labels: { app: streamhouse-demo }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: streamhouse-demo }
+  template:
+    metadata:
+      labels: { app: streamhouse-demo }
+    spec:
+      containers:
+        - name: app
+          image: image-registry.openshift-image-registry.svc:5000/streamhouse-demo/streamhouse-demo:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef: { name: streamhouse-env }
+          env:
+            - { name: DB2_CONFIG_FILE, value: /secrets/db2.json }
+            - { name: ORCHESTRATE_CREDENTIALS_FILE, value: /secrets/orchestrate.json }
+            - { name: KAFKA_CA_FILE, value: /secrets/kafka-ca.crt }
+          volumeMounts:
+            - { name: files, mountPath: /secrets, readOnly: true }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 512Mi }
+      volumes:
+        - name: files
+          secret: { secretName: streamhouse-files }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamhouse-demo
+  labels: { app: streamhouse-demo }
+spec:
+  selector: { app: streamhouse-demo }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: streamhouse-demo
+  labels: { app: streamhouse-demo }
+spec:
+  to: { kind: Service, name: streamhouse-demo }
+  port: { targetPort: http }
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

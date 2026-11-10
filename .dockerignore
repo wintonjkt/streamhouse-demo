@@ -1,0 +1,7 @@
+.git
+.vscode
+.bob
+.env.local
+confluent.md
+backend/certs
+**/__pycache__

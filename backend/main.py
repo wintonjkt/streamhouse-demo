@@ -2,16 +2,43 @@
 
 Run from the repo root:  python3 -m uvicorn backend.main:app --port 8000
 """
+import base64
+import hmac
+import os
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from . import config, db, generator, kafka_io, orchestrate
 
 app = FastAPI(title="Banking Streamhouse Demo API", version="0.1.0",
               description="Synthetic data only. Thresholds are demo logic, not production policy.")
+
+
+@app.get("/healthz", include_in_schema=False)
+def healthz() -> Dict[str, str]:
+    """Liveness/readiness probe: no dependency calls, never requires login."""
+    return {"status": "ok"}
+
+
+@app.middleware("http")
+async def _basic_auth(request: Request, call_next):
+    """Optional HTTP basic auth. Enabled when DEMO_PASSWORD is set (used when the app is exposed on a route)."""
+    password = os.environ.get("DEMO_PASSWORD")
+    if not password or request.url.path == "/healthz":
+        return await call_next(request)
+    user = os.environ.get("DEMO_USER", "demo")
+    header = request.headers.get("authorization", "")
+    if header.lower().startswith("basic "):
+        try:
+            given_user, _, given_pw = base64.b64decode(header[6:]).decode("utf-8").partition(":")
+            if hmac.compare_digest(given_user, user) and hmac.compare_digest(given_pw, password):
+                return await call_next(request)
+        except Exception:
+            pass
+    return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Banking Streamhouse Demo"'})
 
 
 @app.exception_handler(generator.NotFound)
