@@ -90,6 +90,32 @@
   .guidelink { margin:-4px 0 16px; font-size:14px; }
   .guidelink a { color:var(--blue); font-weight:600; text-decoration:none; border-bottom:1px solid var(--blue); }
   .guidelink a:hover { background:#edf5ff; }
+  .arch { margin-top:12px; border:1px solid var(--line); background:var(--card); padding:12px 16px 8px; }
+  .arch h3 { margin:0 0 2px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .arch .sub { margin:0 0 8px; font-size:12px; color:var(--muted); }
+  .arch .scroll { overflow-x:auto; }
+  .arch svg { display:block; width:100%; min-width:900px; height:auto; font-family:inherit; }
+  .arch .box { fill:#fff; stroke:#8d8d8d; stroke-width:1.2; }
+  .arch .ext { fill:#f4f4f4; stroke:#8d8d8d; }
+  .arch .app { fill:#edf5ff; stroke:#0f62fe; }
+  .arch .topic { fill:#fff; stroke:#0f62fe; }
+  .arch .comp { fill:#fff; stroke:#0f62fe; stroke-dasharray:4 3; }
+  .arch .flink { fill:#e8daff; stroke:#8a3ffc; stroke-width:1.6; }
+  .arch .out { fill:#d0e2ff; stroke:#0f62fe; stroke-width:1.6; }
+  .arch .ai { fill:#defbe6; stroke:#198038; stroke-width:1.6; }
+  .arch .human { fill:#fff; stroke:#198038; stroke-width:1.6; }
+  .arch .cp { fill:none; stroke:#a8a8a8; stroke-width:1.2; stroke-dasharray:6 4; }
+  .arch .t { font-size:13px; font-weight:600; fill:#161616; }
+  .arch .m { font-size:11px; fill:#525252; }
+  .arch .cap { font-size:10.5px; font-weight:700; letter-spacing:.06em; fill:#0f62fe; }
+  .arch .capg { fill:#198038; }
+  .arch .lbl { font-size:11px; fill:#161616; }
+  .arch .ln { stroke:#525252; stroke-width:1.5; fill:none; marker-end:url(#arr); }
+  .arch .ln2 { stroke:#525252; stroke-width:1.5; fill:none; marker-start:url(#arr); marker-end:url(#arr); }
+  .arch .num circle { fill:#161616; } .arch .num text { fill:#fff; font-size:11px; font-weight:700; text-anchor:middle; }
+  .arch ol { margin:6px 0 4px; padding-left:20px; font-size:12px; line-height:1.55; columns:2; column-gap:28px; }
+  .arch li { break-inside:avoid; }
+  @media (max-width: 900px) { .arch ol { columns:1; } }
 </style>
 </head>
 <body>
@@ -105,6 +131,122 @@
       <div class="p"><h3>The problem</h3><p>Banks hold rich customer data, but it sits in separate systems and arrives in batches. When a premium customer starts moving money to another bank, the bank usually finds out after the money has gone. A single transfer or search looks normal on its own.</p></div>
       <div class="s"><h3>The streamhouse</h3><p>Live events (<em>what just happened</em>) are joined with customer history from Db2 (<em>what we know</em>) by Flink, continuously. The result is one always-current customer state with a risk level and a reason (<em>what is true now</em>).</p></div>
       <div class="a"><h3>The action</h3><p>An AI assistant reads that trusted state and recommends the next step (<em>what we should do</em>). The relationship manager decides. Nothing is sent to the customer automatically.</p></div>
+    </div>
+    <div class="arch">
+      <h3>Demo architecture</h3>
+      <p class="sub">Follow the numbers: events flow left to right, history joins at Flink, the AI reads the result, a person decides.</p>
+      <div class="scroll">
+      <svg viewBox="0 0 1240 452" role="img" aria-labelledby="archT archD" xmlns="http://www.w3.org/2000/svg">
+        <title id="archT">Banking Streamhouse demo architecture</title>
+        <desc id="archD">An event generator publishes transactions and digital events to Kafka. Db2 customer history is published to compacted Kafka topics. Flink SQL joins them and writes the customer state and alerts. A backend reads the state and asks the watsonx Orchestrate agent for a next-best action, which a relationship manager approves.</desc>
+        <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#525252"/></marker></defs>
+
+        <!-- Confluent container -->
+        <rect class="cp" x="235" y="10" width="670" height="372" rx="4"/>
+        <text class="m" x="247" y="372">Confluent Platform on one IBM Cloud VM: Kafka (3 brokers) and Flink on CMF</text>
+
+        <!-- left column -->
+        <rect class="app" x="20" y="45" width="180" height="85" rx="3"/>
+        <text class="t" x="32" y="70">Event generator</text>
+        <text class="m" x="32" y="88">FastAPI, 5 scripted steps</text>
+        <text class="m" x="32" y="104">audit copy kept in Db2</text>
+
+        <rect class="ext" x="20" y="225" width="180" height="110" rx="3"/>
+        <text class="t" x="32" y="250">Db2 on Cloud</text>
+        <text class="m" x="32" y="269">Customer and account history</text>
+        <text class="m" x="32" y="285">normal behavior, products</text>
+        <text class="m" x="32" y="301">+ audit and AI decision log</text>
+
+        <!-- inputs: what just happened -->
+        <text class="cap" x="255" y="38">WHAT JUST HAPPENED</text>
+        <rect class="topic" x="255" y="48" width="190" height="42" rx="3"/>
+        <text class="t" x="267" y="68">bank.transactions</text><text class="m" x="267" y="83">transfers, deposits, card</text>
+        <rect class="topic" x="255" y="100" width="190" height="42" rx="3"/>
+        <text class="t" x="267" y="120">bank.digital-events</text><text class="m" x="267" y="135">mobile app searches</text>
+
+        <!-- inputs: what we know -->
+        <text class="cap" x="255" y="212">WHAT WE KNOW</text>
+        <rect class="comp" x="255" y="222" width="190" height="42" rx="3"/>
+        <text class="t" x="267" y="242">bank.customer</text><text class="m" x="267" y="257">compacted, from Db2</text>
+        <rect class="comp" x="255" y="274" width="190" height="42" rx="3"/>
+        <text class="t" x="267" y="294">bank.accounts</text><text class="m" x="267" y="309">compacted, from Db2</text>
+
+        <!-- Flink -->
+        <rect class="flink" x="500" y="85" width="170" height="250" rx="3"/>
+        <text class="t" x="512" y="110">Apache Flink SQL</text>
+        <text class="m" x="512" y="126">join, enrich, score</text>
+        <text class="t" x="512" y="160">cs4: customer state</text>
+        <text class="m" x="512" y="177">union both event topics</text>
+        <text class="m" x="512" y="192">24 h window per customer</text>
+        <text class="m" x="512" y="207">join Db2 history</text>
+        <text class="m" x="512" y="222">risk level and reason</text>
+        <text class="t" x="512" y="262">al1: alerts</text>
+        <text class="m" x="512" y="279">write an alert when HIGH</text>
+        <text class="m" x="512" y="312">SQL visible in the Flink tab</text>
+
+        <!-- outputs -->
+        <text class="cap" x="725" y="108">WHAT IS TRUE NOW</text>
+        <rect class="out" x="725" y="118" width="160" height="56" rx="3"/>
+        <text class="t" x="737" y="141">bank.customer-state</text><text class="m" x="737" y="158">Andi right now</text>
+        <rect class="out" x="725" y="238" width="160" height="56" rx="3"/>
+        <text class="t" x="737" y="261">bank.alerts</text><text class="m" x="737" y="278">HIGH-risk transitions</text>
+
+        <!-- right column -->
+        <rect class="app" x="940" y="20" width="280" height="62" rx="3"/>
+        <text class="t" x="952" y="44">Browser: this page</text>
+        <text class="m" x="952" y="62">generator, data viewer, state card</text>
+        <rect class="app" x="940" y="125" width="280" height="85" rx="3"/>
+        <text class="t" x="952" y="149">FastAPI backend (OpenShift pod)</text>
+        <text class="m" x="952" y="167">reads state and alerts from Kafka</text>
+        <text class="m" x="952" y="183">builds the prompt, keeps the API key</text>
+        <text class="m" x="952" y="199">logs advice and decision to Db2</text>
+        <rect class="ai" x="940" y="262" width="280" height="80" rx="3"/>
+        <text class="cap capg" x="952" y="282">WHAT TO DO NEXT</text>
+        <text class="t" x="952" y="302">watsonx Orchestrate agent</text>
+        <text class="m" x="952" y="320">Assessment, evidence, action</text>
+        <text class="m" x="952" y="334">advisory only</text>
+        <rect class="human" x="940" y="385" width="280" height="55" rx="3"/>
+        <text class="t" x="952" y="408">Relationship manager</text>
+        <text class="m" x="952" y="426">approves or dismisses, nothing is auto-sent</text>
+
+        <!-- arrows -->
+        <path class="ln" d="M200,75 L255,69"/>
+        <path class="ln" d="M200,100 L255,121"/>
+        <path class="ln" d="M200,262 L255,243"/>
+        <path class="ln" d="M200,298 L255,295"/>
+        <path class="ln" d="M445,69 L500,150"/>
+        <path class="ln" d="M445,121 L500,170"/>
+        <path class="ln" d="M445,243 L500,225"/>
+        <path class="ln" d="M445,295 L500,245"/>
+        <path class="ln" d="M670,146 L725,146"/>
+        <path class="ln" d="M670,266 L725,266"/>
+        <path class="ln" d="M885,146 L940,160"/>
+        <path class="ln" d="M885,266 L912,266 L912,196 L940,196"/>
+        <path class="ln" d="M1080,210 L1080,262"/>
+        <path class="ln" d="M1080,342 L1080,385"/>
+        <path class="ln2" d="M1080,82 L1080,125"/>
+        <text class="lbl" x="1090" y="240">state only</text>
+        <text class="lbl" x="1090" y="368">advice</text>
+
+        <!-- step numbers -->
+        <g class="num"><circle cx="228" cy="72" r="9"/><text x="228" y="76">1</text></g>
+        <g class="num"><circle cx="228" cy="265" r="9"/><text x="228" y="269">2</text></g>
+        <g class="num"><circle cx="472" cy="110" r="9"/><text x="472" y="114">3</text></g>
+        <g class="num"><circle cx="697" cy="126" r="9"/><text x="697" y="130">4</text></g>
+        <g class="num"><circle cx="912" cy="150" r="9"/><text x="912" y="154">5</text></g>
+        <g class="num"><circle cx="1062" cy="240" r="9"/><text x="1062" y="244">6</text></g>
+        <g class="num"><circle cx="1062" cy="366" r="9"/><text x="1062" y="370">7</text></g>
+      </svg>
+      </div>
+      <ol>
+        <li><strong>Events:</strong> each scripted step is published to Kafka and copied to Db2 for audit.</li>
+        <li><strong>History:</strong> Db2 customer and account rows are published to compacted topics (a Connect JDBC source would do this in production).</li>
+        <li><strong>Join:</strong> Flink reads events and history together, continuously.</li>
+        <li><strong>State:</strong> Flink writes the current customer state and, on HIGH, an alert.</li>
+        <li><strong>Read:</strong> the backend reads the state; the browser never talks to Kafka or Db2 directly.</li>
+        <li><strong>Ask:</strong> only the state is sent to the Orchestrate agent.</li>
+        <li><strong>Decide:</strong> the agent advises; the relationship manager approves or dismisses.</li>
+      </ol>
     </div>
   </details>
   <p class="guidelink"><a href="#guide" id="lnkGuide" aria-controls="guide" aria-expanded="false">Read the user guide: how to run this demo &darr;</a></p>
