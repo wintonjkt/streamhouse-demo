@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banking Streamhouse Demo</title>
+<style>
+  :root { --bg:#f4f4f4; --card:#fff; --line:#e0e0e0; --text:#161616; --muted:#6f6f6f; --blue:#0f62fe; --green:#198038; --amber:#b28600; --red:#da1e28; --dark:#262626; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"IBM Plex Sans",-apple-system,"Segoe UI",system-ui,sans-serif; font-size:14px; color:var(--text); background:var(--bg); }
+  header { background:var(--dark); color:#fff; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:18px; margin:0; font-weight:600; }
+  header .note { font-size:12px; color:#c6c6c6; }
+  main { padding:16px 24px 32px; max-width:1500px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); padding:14px 16px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 10px; font-weight:600; }
+  /* pipeline */
+  .pipeline { display:flex; align-items:stretch; gap:0; margin-bottom:16px; overflow-x:auto; }
+  .stage { flex:1 1 0; min-width:140px; border:1px solid var(--line); background:var(--card); padding:10px 12px; position:relative; transition:background .25s, border-color .25s, box-shadow .25s; }
+  .stage .t { font-weight:600; font-size:13px; }
+  .stage .s { font-size:11px; color:var(--muted); margin-top:2px; }
+  .stage .c { font-size:12px; margin-top:6px; color:var(--blue); font-variant-numeric:tabular-nums; }
+  .stage.active { background:#edf5ff; border-color:var(--blue); box-shadow:0 0 0 2px rgba(15,98,254,.25); }
+  .stage.history { border-style:dashed; }
+  .arrow { align-self:center; padding:0 6px; color:var(--muted); font-size:18px; }
+  .grid { display:grid; grid-template-columns: 300px 1fr 380px; gap:16px; align-items:start; }
+  @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+  button { font:inherit; border:1px solid var(--blue); background:var(--blue); color:#fff; padding:8px 12px; cursor:pointer; }
+  button.secondary { background:#fff; color:var(--blue); }
+  button:disabled { background:#c6c6c6; border-color:#c6c6c6; color:#fff; cursor:not-allowed; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  ol.events { list-style:none; margin:0; padding:0; }
+  ol.events li { border:1px solid var(--line); padding:8px 10px; margin-bottom:6px; display:flex; justify-content:space-between; gap:8px; }
+  ol.events li.done { background:#f0f9f2; border-color:#a7d7b2; }
+  ol.events li.next { border-color:var(--blue); background:#edf5ff; }
+  ol.events .time { color:var(--muted); font-size:12px; }
+  .tabs { display:flex; gap:0; border-bottom:1px solid var(--line); margin-bottom:10px; flex-wrap:wrap; }
+  .tab { padding:8px 12px; cursor:pointer; border:0; background:none; color:var(--muted); border-bottom:2px solid transparent; }
+  .tab.on { color:var(--text); border-bottom-color:var(--blue); font-weight:600; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .empty { color:var(--muted); padding:12px 0; }
+  pre { background:#f4f4f4; padding:10px; overflow:auto; font-size:12px; margin:0; line-height:1.5; }
+  .json { font-family:ui-monospace,Menlo,monospace; font-size:12px; white-space:pre-wrap; word-break:break-all; }
+  .pill { display:inline-block; padding:2px 10px; font-weight:600; font-size:12px; color:#fff; }
+  .LOW { background:var(--green); } .MEDIUM { background:var(--amber); } .HIGH { background:var(--red); }
+  .kv { display:grid; grid-template-columns:1fr auto; gap:4px 12px; font-size:13px; }
+  .kv div:nth-child(odd) { color:var(--muted); }
+  .kv div:nth-child(even) { font-variant-numeric:tabular-nums; text-align:right; }
+  .bar { height:8px; background:#e0e0e0; margin:6px 0 12px; position:relative; }
+  .bar > i { display:block; height:100%; background:var(--blue); transition:width .4s; }
+  select, textarea { font:inherit; width:100%; padding:6px; border:1px solid var(--line); background:#fff; }
+  textarea { height:90px; resize:vertical; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+  .agentout { border-left:3px solid var(--blue); background:#f8fbff; padding:10px 12px; margin-top:10px; white-space:pre-wrap; min-height:40px; }
+  .src { font-size:11px; color:var(--muted); margin-top:6px; }
+  .status { font-size:12px; margin-bottom:8px; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:#8d8d8d; }
+  .dot.ok { background:var(--green); } .dot.bad { background:var(--red); }
+  .stack > * + * { margin-top:16px; }
+  .disclaimer { font-size:11px; color:var(--muted); margin-top:16px; }
+  .flash { animation:flash 1.2s ease-out; }
+  @keyframes flash { from { background:#fff3c4; } to { background:transparent; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Banking Streamhouse Demo &ndash; Andi (C001)</h1>
+  <div class="note">Synthetic data &middot; demo thresholds, not production policy &middot; AI is advisory</div>
+</header>
+<main>
+  <div class="pipeline" id="pipeline">
+    <div class="stage" id="st-gen"><div class="t">1. Event generator</div><div class="s">FastAPI &rarr; Db2 audit + Kafka</div><div class="c" id="c-gen">0 events</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage" id="st-kafka"><div class="t">2. Kafka / Confluent</div><div class="s">bank.transactions, bank.digital-events</div><div class="c" id="c-kafka">0 records</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage" id="st-flink"><div class="t">3. Flink SQL</div><div class="s">join, enrich, score</div><div class="c" id="c-flink">0 evaluations</div></div>
+    <div class="arrow">&larr;</div>
+    <div class="stage history" id="st-db2"><div class="t">Db2 history</div><div class="s">bank.customer, bank.accounts</div><div class="c">profile, accounts, normal behavior</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage" id="st-state"><div class="t">4. Customer state</div><div class="s">bank.customer-state, bank.alerts</div><div class="c" id="c-state">LOW</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage" id="st-agent"><div class="t">5. watsonx Orchestrate</div><div class="s">next-best action</div><div class="c" id="c-agent">idle</div></div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Transaction generator</h2>
+      <ol class="events" id="events"></ol>
+      <div class="row">
+        <button id="btnNext">Send next event</button>
+        <button id="btnAuto" class="secondary">Auto-play</button>
+        <button id="btnReset" class="secondary">Reset</button>
+      </div>
+      <div class="src" id="genNote">Each event is written to Db2 (audit) and published to Kafka. Auto-play sends one event every 6 seconds.</div>
+    </section>
+
+    <section class="card">
+      <h2>Data viewer</h2>
+      <div class="tabs" id="tabs">
+        <button class="tab on" data-tab="bank.transactions">bank.transactions</button>
+        <button class="tab" data-tab="bank.digital-events">bank.digital-events</button>
+        <button class="tab" data-tab="db2">Db2 history</button>
+        <button class="tab" data-tab="flink">Flink SQL</button>
+        <button class="tab" data-tab="bank.customer-state">bank.customer-state</button>
+        <button class="tab" data-tab="bank.alerts">bank.alerts</button>
+      </div>
+      <div id="view"></div>
+    </section>
+
+    <div class="stack">
+      <section class="card" id="stateCard">
+        <h2>Current customer state (from Flink)</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <strong id="who">Andi &middot; Premium</strong><span class="pill LOW" id="riskPill">LOW</span>
+        </div>
+        <div class="kv" id="kv"></div>
+        <div class="src" style="margin-top:8px">External transfers (24 h) vs IDR 50M / 100M thresholds</div>
+        <div class="bar"><i id="bar" style="width:0%"></i></div>
+        <div id="reason" class="src"></div>
+      </section>
+
+      <section class="card">
+        <h2>AI assistant &ndash; watsonx Orchestrate</h2>
+        <div class="status"><span class="dot" id="dot"></span><span id="orchStatus">Checking connection&hellip;</span></div>
+        <div class="row" style="margin-top:8px">
+          <button id="btnAsk">Ask agent for next-best action</button>
+        </div>
+        <details style="margin-top:8px"><summary class="src">Prompt sent to the agent (state only)</summary><textarea id="prompt" readonly></textarea></details>
+        <div class="agentout" id="agentOut">Run the events, then ask the agent.</div>
+        <div class="src" id="agentSrc"></div>
+        <div class="row">
+          <button class="secondary" id="btnApprove" disabled>RM approves outreach</button>
+          <button class="secondary" id="btnReject" disabled>Dismiss</button>
+        </div>
+        <div class="src" id="approval"></div>
+      </section>
+    </div>
+  </div>
+  <p class="disclaimer">All customers, balances and events are synthetic. Risk thresholds are illustrative demo logic. The AI recommendation is advisory; a human relationship manager must approve any contact. The browser never sees the Orchestrate API key &ndash; calls go through the backend.</p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var M = 1000000, CID = "C001";
+  var S = { run: null, steps: [], customer: null, tab: "bank.transactions", cache: {}, state: null, stateCount: 0,
+            flinkSql: {}, recId: null, lastRisk: "LOW", orchOk: false };
+  var timer = null, polling = false;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function num(n) { return Number(n); }
+  function fmtM(n) { n = num(n) || 0; var s = n < 0 ? "-" : ""; return s + "IDR " + (Math.abs(n) / M).toFixed(Math.abs(n) % M ? 1 : 0) + "M"; }
+  function api(path, opts) {
+    return fetch(path, opts).then(function (r) {
+      return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || j.detail || ("HTTP " + r.status)); return j; });
+    });
+  }
+  function post(path, body) { return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) }); }
+  function pulse(ids) {
+    ids.forEach(function (id) { $(id).classList.add("active"); });
+    setTimeout(function () { ids.forEach(function (id) { $(id).classList.remove("active"); }); }, 900);
+  }
+  function runRecords(topic) {
+    return (S.cache[topic] || []).filter(function (r) { return r.value && r.value.run_id === S.run.run_id; });
+  }
+
+  /* ---- data loading ---- */
+  function loadTopic(topic) {
+    return api("/api/kafka/" + topic + "?limit=50").then(function (d) { S.cache[topic] = d.records; });
+  }
+  function refreshState() {
+    return loadTopic("bank.customer-state").then(function () {
+      var recs = runRecords("bank.customer-state");
+      var changed = recs.length !== S.stateCount;
+      S.stateCount = recs.length;
+      S.state = recs.length ? recs[recs.length - 1].value : null;
+      if (changed) { pulse(["st-flink", "st-state"]); }
+      return changed;
+    });
+  }
+  function refreshTab() {
+    if (S.tab === "db2" || S.tab === "flink") return Promise.resolve();
+    return loadTopic(S.tab);
+  }
+  function refreshAll() {
+    if (polling || !S.run) return Promise.resolve();
+    polling = true;
+    return Promise.all([refreshState(), refreshTab(), loadTopic("bank.transactions"), loadTopic("bank.digital-events")])
+      .then(function () { render(); }).catch(function (e) { $("genNote").textContent = "Refresh failed: " + e.message; })
+      .then(function () { polling = false; });
+  }
+
+  /* ---- rendering ---- */
+  function renderEvents() {
+    $("events").innerHTML = S.steps.map(function (e, i) {
+      var n = S.run.next_step;
+      return '<li class="' + (i < n ? "done" : (i === n ? "next" : "")) + '"><span>' + esc(e.label) + "</span><span class=\"time\">" + (i < n ? "sent" : "") + "</span></li>";
+    }).join("");
+    $("btnNext").disabled = S.run.next_step >= S.steps.length;
+  }
+
+  function jsonRows(list) {
+    if (!list.length) return '<div class="empty">No records for this run yet. Send an event from the generator.</div>';
+    return '<table><thead><tr><th>p/offset</th><th>key</th><th>value</th></tr></thead><tbody>' + list.map(function (r, i) {
+      return '<tr class="' + (i === list.length - 1 ? "flash" : "") + '"><td>' + r.partition + "/" + r.offset + "</td><td>" + esc(r.key) + '</td><td class="json">' + esc(JSON.stringify(r.value)) + "</td></tr>";
+    }).join("") + "</tbody></table>";
+  }
+
+  function renderView() {
+    var t = S.tab, html = "";
+    if (t === "db2") {
+      var c = S.customer;
+      html = '<div class="src">Source: Db2 on Cloud (schema KCG18646), published to the compacted topics bank.customer and bank.accounts. Read-only during the demo.</div>';
+      if (c) {
+        html += '<h2 style="margin-top:10px">CUSTOMER</h2><table><thead><tr><th>customer_id</th><th>name</th><th>segment</th><th>avg_balance</th><th>normal_external_transfer</th><th>churn_risk</th></tr></thead><tbody><tr><td>' +
+          esc(c.customer_id) + "</td><td>" + esc(c.name) + "</td><td>" + esc(c.segment) + '</td><td class="num">' + num(c.avg_balance).toLocaleString() + '</td><td class="num">' + num(c.normal_external_transfer).toLocaleString() + "</td><td>" + esc(c.churn_risk) + "</td></tr></tbody></table>" +
+          '<h2 style="margin-top:14px">ACCOUNT (seed values)</h2><table><thead><tr><th>account_id</th><th>account_type</th><th>balance</th></tr></thead><tbody>' +
+          c.accounts.map(function (a) { return "<tr><td>" + esc(a.account_id) + "</td><td>" + esc(a.account_type) + '</td><td class="num">' + num(a.balance).toLocaleString() + "</td></tr>"; }).join("") + "</tbody></table>";
+      }
+    } else if (t === "flink") {
+      var names = Object.keys(S.flinkSql);
+      html = '<div class="src">Deployed on Confluent Manager for Apache Flink (statements cs4 and al1). Evaluations so far: ' + S.stateCount + "</div>" +
+        (names.length ? names.map(function (n) { return '<h2 style="margin-top:10px">' + esc(n) + "</h2><pre>" + esc(S.flinkSql[n]) + "</pre>"; }).join("") : '<div class="empty">Flink SQL not loaded.</div>');
+    } else if (t === "bank.customer-state") {
+      var recs = runRecords(t);
+      html = !recs.length ? '<div class="empty">No state updates yet. Flink writes one per event, usually within a few seconds.</div>' :
+        '<table><thead><tr><th>as_of</th><th>risk</th><th>balance</th><th>ext 24h</th><th>search</th><th>card</th></tr></thead><tbody>' +
+        recs.map(function (r, i) { var v = r.value; return '<tr class="' + (i === recs.length - 1 ? "flash" : "") + '"><td>' + esc(v.as_of) + '</td><td><span class="pill ' + v.customer_risk + '">' + v.customer_risk + '</span></td><td class="num">' + fmtM(v.current_balance) + '</td><td class="num">' + fmtM(v.external_transfer_24h) + "</td><td>" + esc(v.recent_product_search || "-") + "</td><td>" + esc(v.credit_card_activity) + "</td></tr>"; }).join("") + "</tbody></table>";
+    } else if (t === "bank.alerts") {
+      var al = runRecords(t).filter(function (r) { return r.value; });
+      html = !al.length ? '<div class="empty">No alerts. A HIGH transition writes here.</div>' : al.map(function (r) { return '<pre class="flash">' + esc(JSON.stringify(r.value, null, 2)) + "</pre>"; }).join("");
+    } else {
+      html = jsonRows(runRecords(t));
+    }
+    $("view").innerHTML = html;
+    Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (b) { b.classList.toggle("on", b.dataset.tab === t); });
+  }
+
+  function renderState() {
+    var st = S.state, c = S.customer;
+    var base = c ? { name: c.name, segment: c.segment, current_balance: num(c.accounts.filter(function (a) { return a.account_type === "SAVINGS"; })[0].balance),
+      avg_balance: num(c.avg_balance), external_transfer_24h: 0, external_transfer_vs_normal: 0, recent_product_search: null,
+      credit_card_activity: "normal", engagement: c.engagement_level, products_owned: c.products_owned, customer_risk: "LOW", risk_reason: "" } : {};
+    var v = st || base;
+    $("who").textContent = (v.name || "") + " \u00b7 " + (v.segment || "");
+    $("kv").innerHTML = [
+      ["Current savings balance", fmtM(v.current_balance)], ["Normal average balance", fmtM(v.avg_balance)],
+      ["External transfers (24 h)", fmtM(v.external_transfer_24h)], ["vs normal monthly", v.external_transfer_vs_normal + "x"],
+      ["Recent product search", v.recent_product_search || "none"], ["Credit-card usage", v.credit_card_activity],
+      ["Engagement", v.engagement], ["Products owned", v.products_owned]
+    ].map(function (r) { return "<div>" + r[0] + "</div><div>" + esc(r[1]) + "</div>"; }).join("");
+    var pill = $("riskPill"); pill.textContent = v.customer_risk; pill.className = "pill " + v.customer_risk;
+    $("c-state").textContent = v.customer_risk;
+    $("bar").style.width = Math.min(100, num(v.external_transfer_24h) / (120 * M) * 100) + "%";
+    $("bar").style.background = v.customer_risk === "HIGH" ? "#da1e28" : v.customer_risk === "MEDIUM" ? "#b28600" : "#0f62fe";
+    $("reason").textContent = v.customer_risk === "LOW" ? "" : "Reason: " + v.risk_reason;
+    if (v.customer_risk !== S.lastRisk) { $("stateCard").classList.remove("flash"); void $("stateCard").offsetWidth; $("stateCard").classList.add("flash"); S.lastRisk = v.customer_risk; }
+    $("btnAsk").disabled = !st;
+  }
+
+  function render() {
+    if (!S.run) return;
+    renderEvents(); renderView(); renderState();
+    $("c-gen").textContent = S.run.next_step + " events";
+    $("c-kafka").textContent = (runRecords("bank.transactions").length + runRecords("bank.digital-events").length) + " records";
+    $("c-flink").textContent = S.stateCount + " evaluations";
+  }
+
+  /* ---- agent ---- */
+  function mdLite(t) { return esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"); }
+  function simulatedAnswer(st) {
+    if (st.customer_risk === "HIGH") return "SIMULATED: A significant change in behavior was detected. " + fmtM(st.external_transfer_24h) + " moved to external banks in 24 h versus a normal " + fmtM(st.normal_external_transfer) + ". Recommended action: the relationship manager contacts " + st.name + " to discuss deposit or investment options. No automatic customer contact.";
+    return "SIMULATED: No conclusive change yet. Recommended action: keep monitoring.";
+  }
+  function askAgent() {
+    var out = $("agentOut");
+    $("btnAsk").disabled = true; out.textContent = "Asking agent\u2026"; $("agentSrc").textContent = "";
+    pulse(["st-agent"]); $("c-agent").textContent = "thinking";
+    post("/api/agent/recommend", { customer_id: CID, run_id: S.run.run_id }).then(function (res) {
+      out.innerHTML = mdLite(res.recommendation.recommendation);
+      $("prompt").value = res.prompt;
+      $("agentSrc").textContent = "Source: watsonx Orchestrate agent banking_rm_assistant \u00b7 logged to Db2 AI_RECOMMENDATION (" + res.recommendation.recommendation_id.slice(0, 8) + ")";
+      S.recId = res.recommendation.recommendation_id;
+      $("btnApprove").disabled = $("btnReject").disabled = res.state.customer_risk === "LOW";
+      $("c-agent").textContent = "answered";
+    }).catch(function (e) {
+      out.textContent = simulatedAnswer(S.state);
+      $("agentSrc").textContent = "Orchestrate call failed (" + e.message + "); showing a SIMULATED answer";
+      $("c-agent").textContent = "simulated";
+    }).then(function () { $("btnAsk").disabled = !S.state; $("approval").textContent = ""; });
+  }
+  function decide(d) {
+    if (!S.recId) return;
+    post("/api/recommendations/" + S.recId + "/decision", { decision: d }).then(function () {
+      $("approval").textContent = d === "APPROVED" ? "Approved by relationship manager and logged to Db2 (demo only, nothing is sent to the customer)." : "Recommendation dismissed by relationship manager and logged to Db2.";
+    }).catch(function (e) { $("approval").textContent = "Could not record decision: " + e.message; });
+  }
+
+  /* ---- generator ---- */
+  function sendNext() {
+    if (!S.run || S.run.next_step >= S.steps.length) return Promise.resolve();
+    $("btnNext").disabled = true;
+    return post("/api/scenario/runs/" + S.run.run_id + "/next").then(function (r) {
+      S.run = r.run; pulse(["st-gen"]); setTimeout(function () { pulse(["st-kafka"]); }, 300);
+      render(); return refreshAll();
+    }).catch(function (e) { $("genNote").textContent = "Send failed: " + e.message; render(); });
+  }
+  function stopAuto() { if (timer) { clearInterval(timer); timer = null; } $("btnAuto").textContent = "Auto-play"; }
+  function reset() {
+    stopAuto();
+    return post("/api/admin/reset").then(function (r) {
+      S.run = r.run; S.state = null; S.stateCount = 0; S.recId = null; S.lastRisk = "LOW";
+      $("agentOut").textContent = "Run the events, then ask the agent."; $("agentSrc").textContent = ""; $("approval").textContent = "";
+      $("btnApprove").disabled = $("btnReject").disabled = true; $("c-agent").textContent = "idle";
+      return post("/api/admin/publish-reference-data");
+    }).then(function () { return refreshAll(); }).catch(function (e) { $("genNote").textContent = "Reset failed: " + e.message; });
+  }
+
+  /* ---- startup ---- */
+  function init() {
+    api("/api/health").then(function (h) {
+      S.orchOk = h.orchestrate && h.orchestrate.ok;
+      $("dot").className = "dot " + (S.orchOk ? "ok" : "bad");
+      $("orchStatus").textContent = S.orchOk ? "Connected to watsonx Orchestrate (agent " + h.orchestrate.agent + ")" : "Orchestrate unavailable: " + ((h.orchestrate && h.orchestrate.error) || "unknown") + ". A labelled simulated answer will be used.";
+    });
+    Promise.all([api("/api/customers/" + CID), api("/api/scenario/steps"), api("/api/flink-sql"), api("/api/scenario/runs/latest").catch(function () { return null; })])
+      .then(function (r) {
+        S.customer = r[0]; S.steps = r[1].steps; S.flinkSql = r[2];
+        return r[3] && r[3].status === "RUNNING" ? r[3] : post("/api/scenario/runs", { customer_id: CID });
+      }).then(function (run) { S.run = run; return refreshAll(); })
+      .then(function () { render(); setInterval(refreshAll, 4000); })
+      .catch(function (e) { $("genNote").textContent = "Backend not reachable: " + e.message; });
+  }
+
+  $("btnNext").onclick = sendNext;
+  $("btnAuto").onclick = function () {
+    if (timer) { stopAuto(); return; }
+    $("btnAuto").textContent = "Stop";
+    timer = setInterval(function () { if (!S.run || S.run.next_step >= S.steps.length) stopAuto(); else sendNext(); }, 6000);
+    sendNext();
+  };
+  $("btnReset").onclick = reset;
+  $("btnAsk").onclick = askAgent;
+  $("btnApprove").onclick = function () { decide("APPROVED"); };
+  $("btnReject").onclick = function () { decide("DISMISSED"); };
+  $("tabs").onclick = function (e) { if (e.target.dataset && e.target.dataset.tab) { S.tab = e.target.dataset.tab; renderView(); refreshTab().then(renderView); } };
+  $("btnAsk").disabled = true;
+  init();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+ibm_db>=3.2
+confluent-kafka>=2.4
+pydantic>=2

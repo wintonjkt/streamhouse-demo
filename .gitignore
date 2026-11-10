@@ -1,0 +1,12 @@
+# secrets and credentials - never commit
+.env.local
+ibm-credentials*.env
+data (2).json
+confluent.md
+backend/certs/
+*.pem
+__pycache__/
+.vscode/
+.bob/
+.DS_Store
+*.log
