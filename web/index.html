@@ -87,6 +87,9 @@
   #guide .gtop { display:flex; justify-content:space-between; align-items:center; }
   .chk { display:inline-block; margin-left:8px; font-size:12px; }
   .chk .ok { color:var(--green); font-weight:600; } .chk .no { color:var(--red); font-weight:600; }
+  .guidelink { margin:-4px 0 16px; font-size:14px; }
+  .guidelink a { color:var(--blue); font-weight:600; text-decoration:none; border-bottom:1px solid var(--blue); }
+  .guidelink a:hover { background:#edf5ff; }
 </style>
 </head>
 <body>
@@ -96,60 +99,80 @@
     <button class="hbtn" id="btnGuide" aria-expanded="false" aria-controls="guide">User guide</button></div>
 </header>
 <main>
+  <details class="story-wrap" open style="margin-bottom:16px">
+    <summary class="src" style="cursor:pointer;margin-bottom:6px">The story: why this demo matters (click to hide)</summary>
+    <div class="story" style="margin-bottom:0">
+      <div class="p"><h3>The problem</h3><p>Banks hold rich customer data, but it sits in separate systems and arrives in batches. When a premium customer starts moving money to another bank, the bank usually finds out after the money has gone. A single transfer or search looks normal on its own.</p></div>
+      <div class="s"><h3>The streamhouse</h3><p>Live events (<em>what just happened</em>) are joined with customer history from Db2 (<em>what we know</em>) by Flink, continuously. The result is one always-current customer state with a risk level and a reason (<em>what is true now</em>).</p></div>
+      <div class="a"><h3>The action</h3><p>An AI assistant reads that trusted state and recommends the next step (<em>what we should do</em>). The relationship manager decides. Nothing is sent to the customer automatically.</p></div>
+    </div>
+  </details>
+  <p class="guidelink"><a href="#guide" id="lnkGuide" aria-controls="guide" aria-expanded="false">Read the user guide: how to run this demo &darr;</a></p>
   <section class="card" id="guide" hidden>
-    <div class="gtop"><h2>User guide: run the Banking Streamhouse demo</h2><button class="secondary" id="btnGuideClose">Close</button></div>
-    <p>The demo follows one synthetic customer, <strong>Andi (C001)</strong>, whose behavior changes over five events. You send the events, watch Kafka and Flink turn them into a customer state, then ask an AI agent for the next-best action. Allow about 7 minutes.</p>
+    <div class="gtop"><h2>User guide: run the Banking Streamhouse demo</h2><button class="secondary" id="btnGuideClose">Hide guide</button></div>
+    <p>The demo follows one synthetic customer, <strong>Andi (C001)</strong>, whose behavior changes over five events. You send the events, watch Kafka and Flink turn them into a customer state, then ask an AI agent for the next-best action. Allow about 7 minutes. The demo is already deployed on OpenShift (this page); you can also run it on your laptop.</p>
 
-    <h3>1. Before you start: check the systems</h3>
-    <p>Everything below is live. Press the button, then fix anything marked <span style="color:var(--red)">not ready</span> using section 6.
+    <h3>1. Check the systems</h3>
+    <p>Press the button, then fix anything marked <span style="color:var(--red)">not ready</span> using section 6.
       <button id="btnCheck">Check systems</button><span class="chk" id="chkOut"></span></p>
     <div id="chkDetail" class="src"></div>
 
     <div class="cols">
     <div>
-      <h3>2. First-time setup (once per laptop)</h3>
+      <h3>2. Open the demo</h3>
+      <p><strong>Option A: on OpenShift (recommended).</strong> Nothing to install.</p>
+      <ol>
+        <li>Open <code id="hereUrl">this page's address</code> in a browser.</li>
+        <li>Log in with user <code>demo</code>. The password is stored in the cluster; ask the demo owner or read it with:
+<pre>oc -n streamhouse-demo get secret streamhouse-env \
+  -o jsonpath='{.data.DEMO_PASSWORD}' | base64 -d</pre></li>
+        <li>The Db2 data and Kafka topics are already set up. Go to section 4.</li>
+      </ol>
+      <p><strong>Option B: on your laptop.</strong> Do the one-time setup in section 3, then:</p>
+      <ol>
+        <li>From the repository folder run <code>./start-demo.sh</code> and leave the window open.</li>
+        <li>Open <code>http://localhost:8000/</code>.</li>
+      </ol>
+      <div class="note">Both options use the same Db2, Kafka (Confluent VM) and Orchestrate. Do not run the same scenario from two places at once.</div>
+    </div>
+
+    <div>
+      <h3>3. One-time setup (laptop only)</h3>
       <ol>
         <li>Install <strong>Python 3.9 or newer</strong>, then from the repository folder:
 <pre>pip install -r backend/requirements.txt</pre></li>
         <li>Copy the settings template and fill it in. <code>.env.local</code> is git-ignored and must never be committed:
 <pre>cp .env.example .env.local</pre>
-          You need: the Db2 service-credentials JSON, the Orchestrate service-credentials JSON (<code>apikey</code>, <code>url</code>), the Kafka user and password, and the Kafka bootstrap list from the Confluent environment page.</li>
+          You need the Db2 and Orchestrate credentials files, the Kafka user and password, and the Kafka bootstrap list.</li>
         <li>Download the Kafka CA certificate from the Confluent VM:
 <pre>scp -i cflt-vsi-key.pem root@&lt;vm-ip&gt;:/var/lib/confluent-access/kafka-ca.crt backend/certs/kafka-ca.crt</pre></li>
-        <li>Create the Db2 tables, the sample customer and the Kafka topics. Schema and topics are safe to repeat; <code>seed</code> deletes all demo data in Db2 before reloading Andi, so only run it deliberately:
+        <li>With the server running, create the Db2 tables, the sample customer and the Kafka topics. <code>seed</code> deletes all demo data in Db2 before reloading Andi, so run it deliberately:
 <pre>curl -X POST localhost:8000/api/admin/schema
 curl -X POST localhost:8000/api/admin/seed
-curl -X POST localhost:8000/api/admin/topics</pre>
-          Run these after step 3 below, once the server is up.</li>
-        <li>Confirm the two Flink statements are <strong>RUNNING</strong> on Confluent Manager for Apache Flink: <code>cs4</code> (customer state) and <code>al1</code> (alerts). Their SQL is in <code>flink/</code>.
-<pre>curl -sk -u admin:&lt;password&gt; https://&lt;vm-ip&gt;/cmf/api/v1/environments/flink-env/statements</pre></li>
+curl -X POST localhost:8000/api/admin/topics</pre></li>
       </ol>
-      <div class="note">The Confluent environment on TechZone expires on a set date. Extend it beforehand, and re-check that <code>cs4</code> and <code>al1</code> are still running after any restart.</div>
+      <p><strong>Needed for both options:</strong> the Flink statements <code>cs4</code> (customer state) and <code>al1</code> (alerts) must be <strong>RUNNING</strong> on Confluent Manager for Apache Flink. Their SQL is in <code>flink/</code>.</p>
+<pre>curl -sk -u admin:&lt;password&gt; https://&lt;vm-ip&gt;/cmf/api/v1/environments/flink-env/statements</pre>
+      <div class="note">The Confluent environment on TechZone expires on a set date. Extend it beforehand and re-check <code>cs4</code> and <code>al1</code> after any restart.</div>
+    </div>
     </div>
 
-    <div>
-      <h3>3. Start the demo</h3>
-      <ol>
-        <li>From the repository folder run <code>./start-demo.sh</code>. Leave the window open.</li>
-        <li>Open <code>http://localhost:8000/</code>.</li>
-        <li>Press <strong>Check systems</strong> above. Db2, Kafka and Orchestrate should all be ready.</li>
-        <li>Press <strong>Reset</strong> in the generator. This clears the previous run, starts a new one and republishes Andi's history to Kafka.</li>
-        <li>Check the state card: <span class="pill LOW">LOW</span>, savings IDR 127M.</li>
-      </ol>
-
-      <h3>4. What each part of the page shows</h3>
-      <table>
-        <thead><tr><th>Area</th><th>Meaning</th></tr></thead>
-        <tbody>
-          <tr><td>Pipeline strip</td><td>Stages light up when a real record reaches them. Counters are real.</td></tr>
-          <tr><td>Transaction generator</td><td>Sends the scripted events. Each one is written to Db2 (audit) and published to Kafka.</td></tr>
-          <tr><td>Data viewer</td><td>Live records from Kafka, Andi's history from Db2, and the Flink SQL that does the scoring.</td></tr>
-          <tr><td>Customer state</td><td>Written by Flink, not by the browser. Shows balance, transfers, search, card use, risk and reason.</td></tr>
-          <tr><td>AI assistant</td><td>Sends only the state to the watsonx Orchestrate agent. The answer and the RM decision are logged to Db2.</td></tr>
-        </tbody>
-      </table>
-    </div>
-    </div>
+    <h3>4. Get ready and know the page</h3>
+    <ol>
+      <li>Press <strong>Check systems</strong> above: Db2, Kafka and Orchestrate should all be ready.</li>
+      <li>Press <strong>Reset</strong> in the generator. This clears the previous run, starts a new one and republishes Andi's history to Kafka.</li>
+      <li>Check the state card: <span class="pill LOW">LOW</span>, savings IDR 127M.</li>
+    </ol>
+    <table>
+      <thead><tr><th>Area</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>Pipeline strip</td><td>Stages light up when a real record reaches them. Counters are real.</td></tr>
+        <tr><td>Transaction generator</td><td>Sends the scripted events. Each one is written to Db2 (audit) and published to Kafka.</td></tr>
+        <tr><td>Data viewer</td><td>Live records from Kafka, Andi's history from Db2, and the Flink SQL that does the scoring.</td></tr>
+        <tr><td>Customer state</td><td>Written by Flink, not by the browser. Shows balance, transfers, search, card use, risk and reason.</td></tr>
+        <tr><td>AI assistant</td><td>Sends only the state to the watsonx Orchestrate agent. The answer and the RM decision are logged to Db2.</td></tr>
+      </tbody>
+    </table>
 
     <h3>5. Run the demo</h3>
     <p>Press <strong>Send next event</strong> once per step, or <strong>Auto-play</strong> (one event every 6 seconds). The state card updates a few seconds after each event while Flink processes it.</p>
@@ -174,13 +197,16 @@ curl -X POST localhost:8000/api/admin/topics</pre>
     <table>
       <thead><tr><th>Symptom</th><th>Likely cause</th><th>What to do</th></tr></thead>
       <tbody>
-        <tr><td>Page says "Backend not reachable"</td><td>Server not running or it crashed.</td><td>Run <code>./start-demo.sh</code> again, then reload the page.</td></tr>
-        <tr><td>Check systems shows Db2 not ready</td><td>Wrong or missing Db2 credentials file, or no network.</td><td>Check <code>DB2_CONFIG_FILE</code> in <code>.env.local</code>.</td></tr>
-        <tr><td>Check systems shows Kafka not ready</td><td>VM unreachable, wrong password, or missing CA file.</td><td>Check <code>KAFKA_*</code> in <code>.env.local</code> and that ports 9094 to 9096 are reachable.</td></tr>
-        <tr><td>Events appear in <em>bank.transactions</em> but the state card never changes</td><td>The Flink statements are not running.</td><td>Check <code>cs4</code> and <code>al1</code> (setup step 5). Wait 15 seconds before concluding.</td></tr>
+        <tr><td>Browser keeps asking for a login (OpenShift)</td><td>Wrong password.</td><td>Read the password from the cluster secret (section 2, option A).</td></tr>
+        <tr><td>Page does not load (OpenShift)</td><td>The pod is not running.</td><td><code>oc -n streamhouse-demo get pods</code>. If it is not Running, <code>oc -n streamhouse-demo rollout restart deploy/streamhouse-demo</code>.</td></tr>
+        <tr><td>Page says "Backend not reachable" (laptop)</td><td>Server not running or crashed.</td><td>Run <code>./start-demo.sh</code> again and reload. If the port is busy: <code>lsof -ti tcp:8000 | xargs kill</code>.</td></tr>
+        <tr><td>Check systems shows Db2 not ready</td><td>Wrong or missing Db2 credentials, or no network.</td><td>Laptop: check <code>DB2_CONFIG_FILE</code> in <code>.env.local</code>. OpenShift: check the <code>streamhouse-files</code> secret.</td></tr>
+        <tr><td>Check systems shows Kafka not ready</td><td>VM unreachable, wrong password, or missing CA file.</td><td>Check the Kafka settings and that ports 9094 to 9096 are reachable. The Confluent environment may have expired.</td></tr>
+        <tr><td>Events appear in <em>bank.transactions</em> but the state card never changes</td><td>The Flink statements are not running.</td><td>Check <code>cs4</code> and <code>al1</code> (section 3). Wait 15 seconds before concluding.</td></tr>
         <tr><td>State shows an old run</td><td>Reset was not pressed.</td><td>Press <strong>Reset</strong>.</td></tr>
-        <tr><td>Agent answer starts with "SIMULATED"</td><td>Orchestrate was unreachable. The page labels this on purpose.</td><td>Check the credentials file and the agent name (<code>banking_rm_assistant</code>). Tell the audience it is simulated, or retry.</td></tr>
-        <tr><td>Everything is slow after a long idle period</td><td>Idle Kafka connections were dropped.</td><td>Press the button again, or restart the server.</td></tr>
+        <tr><td>Agent answer starts with "SIMULATED"</td><td>Orchestrate was unreachable. The page labels this on purpose.</td><td>Check the Orchestrate credentials and the agent name (<code>banking_rm_assistant</code>). Tell the audience it is simulated, or retry.</td></tr>
+        <tr><td>Everything is slow after a long idle period</td><td>Idle Kafka connections were dropped.</td><td>Press the button again, or restart the server or pod.</td></tr>
+        <tr><td>You changed the code (OpenShift)</td><td>The image is built from committed files.</td><td>Commit, then follow "Update after a code change" in <code>deploy/DEPLOY.md</code>.</td></tr>
       </tbody>
     </table>
 
@@ -191,17 +217,9 @@ curl -X POST localhost:8000/api/admin/topics</pre>
       <li>The AI advises. A human relationship manager approves any action. Nothing is sent to the customer automatically.</li>
       <li>The streamhouse complements the data warehouse and core banking. It does not replace them.</li>
     </ul>
-    <p class="src">More detail: <code>DEMO_STORYLINE.md</code> (story, architecture, talk track) and <code>streamhouse-implementation-plan.md</code> (how the pieces were built).</p>
+    <p class="src">More detail: <code>DEMO_STORYLINE.md</code> (story, architecture, talk track), <code>deploy/DEPLOY.md</code> (OpenShift) and <code>streamhouse-implementation-plan.md</code> (how the pieces were built).</p>
   </section>
 
-  <details class="story-wrap" open style="margin-bottom:16px">
-    <summary class="src" style="cursor:pointer;margin-bottom:6px">The story: why this demo matters (click to hide)</summary>
-    <div class="story" style="margin-bottom:0">
-      <div class="p"><h3>The problem</h3><p>Banks hold rich customer data, but it sits in separate systems and arrives in batches. When a premium customer starts moving money to another bank, the bank usually finds out after the money has gone. A single transfer or search looks normal on its own.</p></div>
-      <div class="s"><h3>The streamhouse</h3><p>Live events (<em>what just happened</em>) are joined with customer history from Db2 (<em>what we know</em>) by Flink, continuously. The result is one always-current customer state with a risk level and a reason (<em>what is true now</em>).</p></div>
-      <div class="a"><h3>The action</h3><p>An AI assistant reads that trusted state and recommends the next step (<em>what we should do</em>). The relationship manager decides. Nothing is sent to the customer automatically.</p></div>
-    </div>
-  </details>
   <div class="pipeline" id="pipeline">
     <div class="stage" id="st-gen"><div class="t">1. Event generator</div><div class="s">FastAPI &rarr; Db2 audit + Kafka</div><div class="c" id="c-gen">0 events</div></div>
     <div class="arrow">&rarr;</div>
@@ -482,11 +500,16 @@ curl -X POST localhost:8000/api/admin/topics</pre>
 
   /* ---- user guide ---- */
   function setGuide(open) {
-    $("guide").hidden = !open; $("btnGuide").setAttribute("aria-expanded", open ? "true" : "false");
+    $("guide").hidden = !open;
+    $("btnGuide").setAttribute("aria-expanded", open ? "true" : "false");
+    $("lnkGuide").setAttribute("aria-expanded", open ? "true" : "false");
+    $("lnkGuide").innerHTML = open ? "Hide the user guide &uarr;" : "Read the user guide: how to run this demo &darr;";
     if (open) { $("guide").scrollIntoView({ block: "start" }); }
   }
   $("btnGuide").onclick = function () { setGuide($("guide").hidden); };
+  $("lnkGuide").onclick = function (e) { e.preventDefault(); setGuide($("guide").hidden); };
   $("btnGuideClose").onclick = function () { setGuide(false); };
+  $("hereUrl").textContent = location.origin + "/";
   $("btnCheck").onclick = function () {
     var out = $("chkOut"), det = $("chkDetail");
     out.textContent = "checking\u2026"; det.textContent = "";
@@ -497,9 +520,9 @@ curl -X POST localhost:8000/api/admin/topics</pre>
       out.innerHTML = tag(db2.ok, "Db2") + " \u00b7 " + tag(kafka.ok && !missing.length, "Kafka") + " \u00b7 " + tag(orch.ok, "Orchestrate");
       var notes = [];
       if (!db2.ok) notes.push("Db2: " + (db2.error || "unknown error"));
-      else if ((db2.tables || []).length < 6) notes.push("Db2 tables missing; run setup step 4.");
+      else if ((db2.tables || []).length < 6) notes.push("Db2 tables missing; run the one-time setup (section 3, step 4).");
       if (!kafka.ok) notes.push("Kafka: " + (kafka.error || "unknown error"));
-      else if (missing.length) notes.push("Kafka topics missing: " + missing.join(", ") + " (setup step 4).");
+      else if (missing.length) notes.push("Kafka topics missing: " + missing.join(", ") + " (section 3, step 4).");
       if (!orch.ok) notes.push("Orchestrate: " + (orch.error || "unknown error") + ". The page will use a labelled simulated answer.");
       notes.push("Flink cannot be checked from here: send one event and confirm the state card changes within about 15 seconds.");
       det.textContent = notes.join(" ");
