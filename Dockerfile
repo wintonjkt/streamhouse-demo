@@ -1,5 +1,6 @@
-# Banking Streamhouse demo image. Base image is supplied by the OpenShift BuildConfig (python:3.11-ubi9).
-FROM python:3.11-ubi9
+# Banking Streamhouse demo image. In OpenShift the base is the openshift/python:3.11-ubi9 image stream tag
+# (set in the BuildConfig); this FROM is the equivalent public Red Hat image for local builds.
+FROM registry.access.redhat.com/ubi9/python-311
 WORKDIR /opt/app-root/src
 COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
