@@ -6,6 +6,9 @@ metadata:
   labels: { app: streamhouse-demo }
 spec:
   replicas: 1
+  # Recreate: the workers are nearly full on CPU requests, so a surge pod may not schedule.
+  strategy:
+    type: Recreate
   selector:
     matchLabels: { app: streamhouse-demo }
   template:
@@ -34,7 +37,7 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests: { cpu: 100m, memory: 256Mi }
+            requests: { cpu: 20m, memory: 192Mi }
             limits: { cpu: "1", memory: 512Mi }
       volumes:
         - name: files

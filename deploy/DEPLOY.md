@@ -90,5 +90,6 @@ oc delete project streamhouse-demo
 ## Notes
 
 - The pod needs outbound access to Db2 (port 31249), the Confluent VM (ports 9094 to 9096) and the Orchestrate and IAM endpoints. This was confirmed on the TechZone cluster.
+- The deployment uses the `Recreate` strategy and a small CPU request, because the TechZone workers are close to full on CPU requests and a second (surge) pod stayed Pending. If a pod is Pending, run `oc describe pod` and check the scheduling events.
 - Run one replica. Reset and the scenario run are shared state, and two pods would not change that, but the demo is designed for one presenter.
 - If the Confluent VM IP changes, update `streamhouse-env` and run `oc rollout restart deploy/streamhouse-demo`.
